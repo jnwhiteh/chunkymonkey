@@ -54,6 +54,16 @@ func (r *chunkReader) HeightMap() []byte {
 	return r.chunkTag.Lookup("/Level/HeightMap").(*nbt.ByteArray).Value
 }
 
+func (r *chunkReader) Entities() []*nbt.Compound {
+	list := r.chunkTag.Lookup("/Level/Entities").(*nbt.List).Value
+	entities := make([]*nbt.Compound, len(list))
+
+	for idx, data := range list {
+		entities[idx] = data.(*nbt.Compound)
+	}
+	return entities
+}
+
 func (r *chunkReader) GetRootTag() *nbt.NamedTag {
 	return r.chunkTag
 }

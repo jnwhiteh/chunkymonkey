@@ -19,7 +19,7 @@ const blockItemSpawnFromEdge = 4.0 / PixelsPerBlock
 type IChunkBlock interface {
 	Rand() *rand.Rand
 	ItemType(itemTypeId ItemTypeId) (itemType *itemtype.ItemType, ok bool)
-	AddSpawn(s object.INonPlayerSpawn)
+	AddEntity(s object.INonPlayerEntity)
 	SetBlockByIndex(blockIndex BlockIndex, blockId BlockId, blockData byte)
 	BlockExtra(blockIndex BlockIndex) interface{}
 	SetBlockExtra(blockIndex BlockIndex, extra interface{})

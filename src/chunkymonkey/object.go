@@ -19,7 +19,7 @@ type ISpawn interface {
 	Position() *AbsXyz
 }
 
-type INonPlayerSpawn interface {
+type INonPlayerEntity interface {
 	ISpawn
 	SetEntityId(EntityId)
 	Tick(physics.BlockQueryFn) (leftBlock bool)

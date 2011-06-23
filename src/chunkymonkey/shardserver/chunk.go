@@ -13,6 +13,7 @@ import (
 	"chunkymonkey/item"
 	"chunkymonkey/itemtype"
 	"chunkymonkey/mob"
+	"chunkymonkey/nbt"
 	"chunkymonkey/object"
 	"chunkymonkey/proto"
 	"chunkymonkey/recipe"
@@ -26,20 +27,16 @@ var enableMobs = flag.Bool(
 
 // A chunk is slice of the world map.
 type Chunk struct {
-	mgr        *LocalShardManager
-	shard      *ChunkShard
-	loc        ChunkXz
-	blocks     []byte
-	blockData  []byte
-	blockLight []byte
-	skyLight   []byte
-	heightMap  []byte
-	// spawn are typically mobs or items.
-	// TODO: (discuss) Maybe split this back into mobs and items?
-	// There are many more users of "spawn" than of only mobs or items. So
-	// I'm inclined to leave it as is.
-	spawn        map[EntityId]object.INonPlayerSpawn
-	blockExtra   map[BlockIndex]interface{} // Used by IBlockAspect to store private specific data.
+	mgr          *LocalShardManager
+	shard        *ChunkShard
+	loc          ChunkXz
+	blocks       []byte
+	blockData    []byte
+	blockLight   []byte
+	skyLight     []byte
+	heightMap    []byte
+	entities     map[EntityId]object.INonPlayerEntity // Entities (mobs, items, etc)
+	blockExtra   map[BlockIndex]interface{}           // Used by IBlockAspect to store private specific data.
 	rand         *rand.Rand
 	neighbours   neighboursCache
 	cachedPacket []byte                               // Cached packet data for this chunk.
@@ -61,7 +58,7 @@ func newChunkFromReader(reader chunkstore.IChunkReader, mgr *LocalShardManager, 
 		skyLight:    reader.SkyLight(),
 		blockLight:  reader.BlockLight(),
 		heightMap:   reader.HeightMap(),
-		spawn:       make(map[EntityId]object.INonPlayerSpawn),
+		entities:    make(map[EntityId]object.INonPlayerEntity),
 		blockExtra:  make(map[BlockIndex]interface{}),
 		rand:        rand.New(rand.NewSource(time.UTC().Seconds())),
 		subscribers: make(map[EntityId]stub.IShardPlayerClient),
@@ -71,6 +68,8 @@ func newChunkFromReader(reader chunkstore.IChunkReader, mgr *LocalShardManager, 
 		activeBlocks:    make(map[BlockIndex]bool),
 		newActiveBlocks: make(map[BlockIndex]bool),
 	}
+
+	chunk.AddEntities(reader.Entities(), mgr)
 	chunk.neighbours.init()
 	return
 }
@@ -123,16 +122,16 @@ func (chunk *Chunk) ItemType(itemTypeId ItemTypeId) (itemType *itemtype.ItemType
 }
 
 // Tells the chunk to take posession of the item/mob from another chunk.
-func (chunk *Chunk) transferSpawn(s object.INonPlayerSpawn) {
-	chunk.spawn[s.GetEntityId()] = s
+func (chunk *Chunk) transferEntity(s object.INonPlayerEntity) {
+	chunk.entities[s.GetEntityId()] = s
 }
 
-// AddSpawn creates a mob or item in this chunk and notifies the new spawn to
-// all chunk subscribers.
-func (chunk *Chunk) AddSpawn(s object.INonPlayerSpawn) {
+// AddEntity creates a mob or item in this chunk and notifies all chunk
+// subscribers of the new entity
+func (chunk *Chunk) AddEntity(s object.INonPlayerEntity) {
 	newEntityId := chunk.mgr.entityMgr.NewEntity()
 	s.SetEntityId(newEntityId)
-	chunk.spawn[newEntityId] = s
+	chunk.entities[newEntityId] = s
 
 	// Spawn new item/mob for players.
 	buf := &bytes.Buffer{}
@@ -140,10 +139,10 @@ func (chunk *Chunk) AddSpawn(s object.INonPlayerSpawn) {
 	chunk.reqMulticastPlayers(-1, buf.Bytes())
 }
 
-func (chunk *Chunk) removeSpawn(s object.INonPlayerSpawn) {
+func (chunk *Chunk) removeEntity(s object.INonPlayerEntity) {
 	e := s.GetEntityId()
 	chunk.mgr.entityMgr.RemoveEntityById(e)
-	chunk.spawn[e] = nil, false
+	chunk.entities[e] = nil, false
 	// Tell all subscribers that the spawn's entity is destroyed.
 	buf := new(bytes.Buffer)
 	proto.WriteEntityDestroy(buf, e)
@@ -314,8 +313,8 @@ func (chunk *Chunk) reqPlaceItem(player stub.IShardPlayerClient, target *BlockXy
 }
 
 func (chunk *Chunk) reqTakeItem(player stub.IShardPlayerClient, entityId EntityId) {
-	if spawn, ok := chunk.spawn[entityId]; ok {
-		if item, ok := spawn.(*item.Item); ok {
+	if entity, ok := chunk.entities[entityId]; ok {
+		if item, ok := entity.(*item.Item); ok {
 			player.ReqGiveItem(*item.Position(), *item.GetSlot())
 
 			// Tell all subscribers to animate the item flying at the
@@ -323,7 +322,7 @@ func (chunk *Chunk) reqTakeItem(player stub.IShardPlayerClient, entityId EntityI
 			buf := new(bytes.Buffer)
 			proto.WriteItemCollect(buf, entityId, player.GetEntityId())
 			chunk.reqMulticastPlayers(-1, buf.Bytes())
-			chunk.removeSpawn(item)
+			chunk.removeEntity(item)
 		}
 	}
 }
@@ -337,7 +336,7 @@ func (chunk *Chunk) reqDropItem(player stub.IShardPlayerClient, content *slot.Sl
 		velocity,
 	)
 
-	chunk.AddSpawn(spawnedItem)
+	chunk.AddEntity(spawnedItem)
 }
 
 func (chunk *Chunk) reqInventoryClick(player stub.IShardPlayerClient, blockLoc *BlockXyz, slotId SlotId, cursor *slot.Slot, rightClick bool, shiftClick bool, txId TxId, expectedSlot *slot.Slot) {
@@ -417,7 +416,7 @@ func (chunk *Chunk) tick() {
 
 // spawnTick runs all spawns for a tick.
 func (chunk *Chunk) spawnTick() {
-	if len(chunk.spawn) == 0 {
+	if len(chunk.entities) == 0 {
 		// Nothing to do, bail out early.
 		return
 	}
@@ -434,13 +433,13 @@ func (chunk *Chunk) spawnTick() {
 		}
 		return
 	}
-	outgoingSpawns := []object.INonPlayerSpawn{}
+	outgoingSpawns := []object.INonPlayerEntity{}
 
-	for _, e := range chunk.spawn {
+	for _, e := range chunk.entities {
 		if e.Tick(blockQuery) {
 			if e.Position().Y <= 0 {
 				// Item or mob fell out of the world.
-				chunk.removeSpawn(e)
+				chunk.removeEntity(e)
 			} else {
 				outgoingSpawns = append(outgoingSpawns, e)
 			}
@@ -451,7 +450,7 @@ func (chunk *Chunk) spawnTick() {
 		// Transfer spawns to new chunk.
 		for _, e := range outgoingSpawns {
 			// Remove mob/items from this chunk.
-			chunk.spawn[e.GetEntityId()] = nil, false
+			chunk.entities[e.GetEntityId()] = nil, false
 
 			// Transfer to other chunk.
 			chunkLoc := e.Position().ToChunkXz()
@@ -459,7 +458,7 @@ func (chunk *Chunk) spawnTick() {
 			// TODO Batch spawns up into a request per shard if there are efficiency
 			// concerns in sending them individually.
 			chunk.mgr.EnqueueOnChunk(chunkLoc, func(blockChunk *Chunk) {
-				blockChunk.transferSpawn(e)
+				blockChunk.transferEntity(e)
 			})
 		}
 	}
@@ -473,7 +472,7 @@ func (chunk *Chunk) spawnTick() {
 				if len(ms) == 0 {
 					log.Printf("%v.Tick: spawning a mob at %v", chunk, playerData.position)
 					m := mob.NewPig(&playerData.position, &AbsVelocity{5, 5, 5})
-					chunk.AddSpawn(&m.Mob)
+					chunk.AddEntity(&m.Mob)
 				}
 				break
 			}
@@ -529,7 +528,7 @@ func (chunk *Chunk) AddActiveBlockIndex(blockIndex BlockIndex) {
 
 func (chunk *Chunk) mobs() (s []*mob.Mob) {
 	s = make([]*mob.Mob, 0, 3)
-	for _, e := range chunk.spawn {
+	for _, e := range chunk.entities {
 		switch e.(type) {
 		case *mob.Mob:
 			s = append(s, e.(*mob.Mob))
@@ -540,7 +539,7 @@ func (chunk *Chunk) mobs() (s []*mob.Mob) {
 
 func (chunk *Chunk) items() (s []*item.Item) {
 	s = make([]*item.Item, 0, 10)
-	for _, e := range chunk.spawn {
+	for _, e := range chunk.entities {
 		switch e.(type) {
 		case *item.Item:
 			s = append(s, e.(*item.Item))
@@ -563,10 +562,10 @@ func (chunk *Chunk) reqSubscribeChunk(entityId EntityId, player stub.IShardPlaye
 
 	player.TransmitPacket(chunk.chunkPacket())
 
-	// Send spawns of all mobs/items in the chunk.
-	if len(chunk.spawn) > 0 {
+	// Send spawns packets for all entities in the chunk.
+	if len(chunk.entities) > 0 {
 		buf := new(bytes.Buffer)
-		for _, e := range chunk.spawn {
+		for _, e := range chunk.entities {
 			e.SendSpawn(buf)
 		}
 		player.TransmitPacket(buf.Bytes())
@@ -718,7 +717,7 @@ func (chunk *Chunk) chunkPacket() []byte {
 
 func (chunk *Chunk) sendUpdate() {
 	buf := &bytes.Buffer{}
-	for _, e := range chunk.spawn {
+	for _, e := range chunk.entities {
 		e.SendUpdate(buf)
 	}
 	chunk.reqMulticastPlayers(-1, buf.Bytes())
@@ -734,4 +733,38 @@ func (chunk *Chunk) isSameChunk(otherChunkLoc *ChunkXz) bool {
 
 func (chunk *Chunk) EnqueueGeneric(fn func()) {
 	chunk.shard.enqueueRequest(&runGeneric{fn})
+}
+
+func (chunk *Chunk) AddEntities(entities []*nbt.Compound, mgr *LocalShardManager) {
+	for _, entity := range entities {
+		// TODO(jnw): Handle non-item entities
+		if entity.Lookup("Item") == nil {
+			continue
+		}
+
+		itemInfo := entity.Lookup("Item").(*nbt.Compound)
+
+		// Grab the basic item data
+		id := ItemTypeId(itemInfo.Lookup("id").(*nbt.Short).Value)
+		count := ItemCount(itemInfo.Lookup("Count").(*nbt.Byte).Value)
+		data := ItemData(itemInfo.Lookup("Damage").(*nbt.Short).Value)
+
+		// Fetch the position data
+		posList := entity.Lookup("Pos").(*nbt.List).Value
+		pos := &AbsXyz{
+			AbsCoord(posList[0].(*nbt.Double).Value),
+			AbsCoord(posList[1].(*nbt.Double).Value),
+			AbsCoord(posList[2].(*nbt.Double).Value),
+		}
+
+		// TODO(jnw): Handle Motion/Velocity
+		velocity := &AbsVelocity{0, 0, 0}
+		entityId := mgr.entityMgr.NewEntity()
+
+		item := item.NewItem(mgr.gameRules.ItemTypes[id], count, data, pos, velocity)
+		item.EntityId = entityId
+		chunk.entities[entityId] = item
+	}
+	return
+
 }
