@@ -400,10 +400,10 @@ func TestBlockIndex_SetBlockData(t *testing.T) {
 
 func TestAddXyz_Overflow(t *testing.T) {
 	type Test struct {
-		input *BlockXyz
-		dx BlockCoord
-		dy BlockYCoord
-		dz BlockCoord
+		input    *BlockXyz
+		dx       BlockCoord
+		dy       BlockYCoord
+		dz       BlockCoord
 		expected *BlockXyz
 	}
 	maxblock := &BlockXyz{MaxXCoord, MaxYCoord, MaxZCoord}

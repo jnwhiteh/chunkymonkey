@@ -692,12 +692,24 @@ func (b *BlockXyz) IsNull() bool {
 // solution to check this, here we go for simplicity and clarity. This
 // function assumes we cannot have a negative Y coordinate.
 func (b *BlockXyz) AddXyz(dx BlockCoord, dy BlockYCoord, dz BlockCoord) (newb *BlockXyz) {
-	if dx > 0 && dx > (MaxXCoord - b.X) { return nil }
-	if dx < 0 && dx < (MinXCoord - b.X) { return nil }
-	if dy > 0 && dy > (MaxYCoord - b.Y) { return nil }
-	if dy < 0 && dy < (MinYCoord - b.Y) { return nil }
-	if dz > 0 && dz > (MaxZCoord - b.Z) { return nil }
-	if dz < 0 && dz < (MinZCoord - b.Z) { return nil }
+	if dx > 0 && dx > (MaxXCoord-b.X) {
+		return nil
+	}
+	if dx < 0 && dx < (MinXCoord-b.X) {
+		return nil
+	}
+	if dy > 0 && dy > (MaxYCoord-b.Y) {
+		return nil
+	}
+	if dy < 0 && dy < (MinYCoord-b.Y) {
+		return nil
+	}
+	if dz > 0 && dz > (MaxZCoord-b.Z) {
+		return nil
+	}
+	if dz < 0 && dz < (MinZCoord-b.Z) {
+		return nil
+	}
 
 	return &BlockXyz{
 		b.X + dx,
