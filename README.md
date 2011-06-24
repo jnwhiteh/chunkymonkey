@@ -70,16 +70,22 @@ The [Go toolchain][1] must be installed.
 Building
 --------
 
-[Godag][2] is used to build chunkymonkey. Install it, and run:
+[gb][2] can be used to build chunkymonkey, or you can use the included
+build/Makefile system. Change into the src directory and then either run
+`./build.sh` or `gb`:
 
-    $ make
+    $ cd src
+    $ ./build.sh
+
+This will compile chunkymonkey and all of associated packages and commands.
+Executable commands will be placed in the src/bin directory.
 
 Running
 -------
 
 Serve up a single player world:
 
-    $ ./chunkymonkey ~/.minecraft/saves/World1
+    $ src/bin/chunkymonkey ~/.minecraft/saves/World1
     2010/10/03 16:32:13 Listening on  :25565
 
 Record/replay
@@ -91,11 +97,11 @@ without having real people logging in.
 
 To record a session:
 
-    $ ./chunkymonkey --record player.log ~/.minecraft/saves/World1
+    $ src/bin/chunkymonkey --record player.log ~/.minecraft/saves/World1
 
 To replay a session:
 
-    $ ./chunkymonkey --replay player.log ~/.minecraft/saves/World1 &
+    $ src/bin/chunkymonkey --replay player.log ~/.minecraft/saves/World1 &
     $ java -jar Minecraft.jar  # start the first player (real human)
     $ nc localhost 25565       # start the second player (replay from log file)
 
@@ -105,5 +111,5 @@ server.
 
 
 [1]: http://golang.org/doc/install.html          "Go toolchain installation"
-[2]: http://code.google.com/p/godag/wiki/Install "Godag builder"
+[2]: https://github.com/skelterjohn/go-gb        "go-gb build tool"
 [3]: https://github.com/huin                     "Huin on Github"
