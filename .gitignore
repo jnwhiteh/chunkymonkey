@@ -3,12 +3,6 @@
 *.a
 *~
 .*.swp
-_obj
-/chunkymonkey
-/datatests
-/intercept
-/inspectlevel
-/replay
-/style
-/test_obj
+src/_obj
+src/bin
 *.log
