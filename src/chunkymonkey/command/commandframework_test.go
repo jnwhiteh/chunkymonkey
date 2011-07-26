@@ -5,6 +5,7 @@ import (
 
 	"gomock.googlecode.com/hg/gomock"
 
+	"chunkymonkey/gamerules"
 	"testmatcher"
 )
 
@@ -12,7 +13,7 @@ func TestCommandFramework(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	mockGame := NewMockICommandHandler(mockCtrl)
+	mockGame := gamerules.NewMockIGame(mockCtrl)
 
 	cf := NewCommandFramework("/")
 

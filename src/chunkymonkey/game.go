@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"time"
 
+	"chunkymonkey/command"
 	. "chunkymonkey/entity"
 	"chunkymonkey/gamerules"
 	"chunkymonkey/player"
@@ -60,6 +61,9 @@ func NewGame(worldPath string) (game *Game, err os.Error) {
 	//game.serverId = "-"
 
 	game.chunkManager = shardserver.NewLocalShardManager(worldStore.ChunkStore, &game.entityManager)
+
+	// TODO: Load the prefix from a config file
+	gamerules.CommandFramework = command.NewCommandFramework("/")
 
 	go game.mainLoop()
 	return

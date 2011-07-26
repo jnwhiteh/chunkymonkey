@@ -2,7 +2,6 @@ package player
 
 import (
 	"bytes"
-	"chunkymonkey/command"
 	"expvar"
 	"fmt"
 	"log"
@@ -60,7 +59,7 @@ type Player struct {
 	mainQueue chan func(*Player)
 	txQueue   chan []byte
 
-	commandHandler command.ICommandHandler
+	game gamerules.IGame
 
 	// TODO remove this lock, packet handling shouldn't use a lock, it should use
 	// a channel instead (ideally).
@@ -69,7 +68,7 @@ type Player struct {
 	onDisconnect chan<- EntityId
 }
 
-func NewPlayer(entityId EntityId, shardConnecter gamerules.IShardConnecter, conn net.Conn, name string, spawnBlock BlockXyz, onDisconnect chan<- EntityId, commandHandler command.ICommandHandler) *Player {
+func NewPlayer(entityId EntityId, shardConnecter gamerules.IShardConnecter, conn net.Conn, name string, spawnBlock BlockXyz, onDisconnect chan<- EntityId, game gamerules.IGame) *Player {
 	player := &Player{
 		EntityId:       entityId,
 		shardConnecter: shardConnecter,
@@ -92,7 +91,7 @@ func NewPlayer(entityId EntityId, shardConnecter gamerules.IShardConnecter, conn
 		mainQueue: make(chan func(*Player), 128),
 		txQueue:   make(chan []byte, 128),
 
-		commandHandler: commandHandler,
+		game: game,
 
 		onDisconnect: onDisconnect,
 	}
@@ -179,7 +178,7 @@ func (player *Player) PacketKeepAlive() {
 func (player *Player) PacketChatMessage(message string) {
 	prefix := gamerules.CommandFramework.Prefix()
 	if message[0:len(prefix)] == prefix {
-		gamerules.CommandFramework.Process(player.name, message, player.commandHandler)
+		gamerules.CommandFramework.Process(player.name, message, player.game)
 	} else {
 		player.sendChatMessage(fmt.Sprintf("<%s> %s", player.name, message), true)
 	}

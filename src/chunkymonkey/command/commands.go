@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"chunkymonkey/gamerules"
 )
 
 func getCommands() map[string]*Command {
@@ -23,7 +25,7 @@ const sayCmd = "say"
 const sayUsage = "say <message>"
 const sayDesc = "Broadcasts a message to all players without showing a player name. The message is colored pink."
 
-func cmdSay(player, message string, cmdHandler ICommandHandler) {
+func cmdSay(player, message string, cmdHandler gamerules.IGame) {
 	args := strings.Split(message, " ", -1)
 	if len(args) < 2 {
 		cmdHandler.SendMessageToPlayer(player, sayUsage)
@@ -39,7 +41,7 @@ const tpCmd = "tp"
 const tpUsage = "tp <player1> <player2>"
 const tpDesc = "Teleports player1 to player2."
 
-func cmdTp(player, message string, cmdHandler ICommandHandler) {
+func cmdTp(player, message string, cmdHandler gamerules.IGame) {
 	args := strings.Split(message, " ", -1)
 	if len(args) < 3 {
 		cmdHandler.SendMessageToPlayer(player, tpUsage)
@@ -67,7 +69,7 @@ const killCmd = "kill"
 const killUsage = "kill"
 const killDesc = "Inflicts damage to self. Useful when lost or stuck."
 
-func cmdKill(player, message string, cmdHandler ICommandHandler) {
+func cmdKill(player, message string, cmdHandler gamerules.IGame) {
 	// TODO inflict damage to player
 	cmdHandler.SendMessageToPlayer(player, msgNotImplemented)
 }
@@ -77,7 +79,7 @@ const tellCmd = "tell"
 const tellUsage = "tell <player> <message>"
 const tellDesc = "Tells a player a message."
 
-func cmdTell(player, message string, cmdHandler ICommandHandler) {
+func cmdTell(player, message string, cmdHandler gamerules.IGame) {
 	args := strings.Split(message, " ", -1)
 	if len(args) < 3 {
 		cmdHandler.SendMessageToPlayer(player, tellUsage)
@@ -96,7 +98,7 @@ const helpUsage = "help|?"
 const helpDesc = "Shows a list of all commands."
 const msgUnknownCommand = "Command not available."
 
-func cmdHelp(player, message string, cmdFramework *CommandFramework, cmdHandler ICommandHandler) {
+func cmdHelp(player, message string, cmdFramework *CommandFramework, cmdHandler gamerules.IGame) {
 	args := strings.Split(message, " ", -1)
 	if len(args) > 2 {
 		cmdHandler.SendMessageToPlayer(player, helpUsage)
@@ -131,7 +133,7 @@ const giveCmd = "give"
 const giveUsage = "give <player> <item ID> [<quantity> [<data>]]"
 const giveDesc = "Gives x amount of y items to player."
 
-func cmdGive(player, message string, cmdHandler ICommandHandler) {
+func cmdGive(player, message string, cmdHandler gamerules.IGame) {
 	args := strings.Split(message, " ", -1)
 	if len(args) < 3 || len(args) > 5 {
 		cmdHandler.SendMessageToPlayer(player, giveUsage)
