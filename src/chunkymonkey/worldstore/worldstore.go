@@ -145,13 +145,18 @@ func (world *WorldStore) PlayerData(user string) (playerData nbt.ITag, err os.Er
 }
 
 func (world *WorldStore) WritePlayerData(user string, data *nbt.Compound) (err os.Error) {
+	playerDir := path.Join(world.WorldPath, "players")
+	if err = os.MkdirAll(playerDir, 0777); err != nil {
+		return
+	}
+
 	filename := path.Join(world.WorldPath, "players", user+".dat")
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
+	defer file.Close()
 
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
 	gzipWriter, err := gzip.NewWriter(file)
 	if err != nil {
@@ -165,7 +170,7 @@ func (world *WorldStore) WritePlayerData(user string, data *nbt.Compound) (err o
 }
 
 // Creates a new world at 'worldPath'
-func CreateWorld(worldPath string) os.Error {
+func CreateWorld(worldPath string) (err os.Error) {
 	source := rand.NewSource(time.Nanoseconds())
 	seed := source.Int63()
 
@@ -191,9 +196,8 @@ func CreateWorld(worldPath string) os.Error {
 		},
 	}
 
-	err := os.MkdirAll(worldPath, 0755)
-	if err != nil {
-		return err
+	if err = os.MkdirAll(worldPath, 0777); err != nil {
+		return
 	}
 
 	filename := path.Join(worldPath, "level.dat")

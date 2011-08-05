@@ -85,11 +85,11 @@ func main() {
 	fi, err := os.Stat(worldPath)
 	if err != nil {
 		log.Printf("Could not load world from directory %v: %v", worldPath, err)
-		log.Printf("Attempting to create a new world in directory %v", worldPath)
+		log.Printf("Creating a new world in directory %v", worldPath)
 		err = worldstore.CreateWorld(worldPath)
 	}
 	if err != nil {
-		log.Printf("Error creating new world in directory %v: %v", worldPath, err)
+		log.Printf("Error creating new world: %v", err)
 	} else {
 		fi, err = os.Stat(worldPath)
 	}
